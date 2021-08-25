@@ -1,0 +1,35 @@
+kind: Deployment
+metadata:
+  name: my-web-server
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: gcr.io/absolute-realm-322617/my-web-server:version1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+
+---
+
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-web-server-hpa
+spec:
+  scaleTargetRef:
+    kind: ReplicaSet
+    name: nginx
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 50
