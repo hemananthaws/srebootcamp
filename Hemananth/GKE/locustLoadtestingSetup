@@ -1,0 +1,137 @@
+Referance URL :- https://cloud.google.com/architecture/distributed-load-testing-using-gke
+
+Setting up the environment
+Clone the sample repository from GitHub:
+
+
+git clone https://github.com/GoogleCloudPlatform/distributed-load-testing-using-kubernetes
+Change your working directory to the cloned repository:
+
+
+cd distributed-load-testing-using-kubernetes
+Creating the GKE cluster
+Create the GKE cluster:
+
+
+gcloud container clusters create $CLUSTER \
+   --zone $ZONE \
+   --scopes $SCOPE \
+   --enable-autoscaling --min-nodes "3" --max-nodes "10" \
+   --scopes=logging-write,storage-ro \
+   --addons HorizontalPodAutoscaling,HttpLoadBalancing
+Connect to the GKE cluster:
+
+
+gcloud container clusters get-credentials $CLUSTER \
+   --zone $ZONE \
+   --project $PROJECT
+Building the Docker image
+Build the Docker image and store it in your project's container registry:
+
+
+gcloud builds submit \
+    --tag gcr.io/$PROJECT/locust-tasks:latest docker-image
+Verify that the Docker image is in your project's container repository:
+
+
+gcloud container images list | grep locust-tasks
+The output looks something like this:
+
+
+gcr.io/[PROJECT]/locust-tasks
+Only listing images in gcr.io/[PROJECT]. Use --repository to list images in other repositories.
+Deploying the sample application
+Deploy the sample application on App Engine:
+
+
+gcloud app deploy sample-webapp/app.yaml \
+  --project=$PROJECT
+The output looks something like the following:
+
+
+File upload done.
+Updating service [default]...done.
+Setting traffic split for service [default]...done.
+Deployed service [default] to [https://[PROJECT].appspot.com]
+Deploying the Locust master and worker nodes
+Replace the target host and project ID with the deployed endpoint and project ID in the locust-master-controller.yaml and locust-worker-controller.yaml files:
+
+
+sed -i -e "s/\[TARGET_HOST\]/$TARGET/g" kubernetes-config/locust-master-controller.yaml
+sed -i -e "s/\[TARGET_HOST\]/$TARGET/g" kubernetes-config/locust-worker-controller.yaml
+sed -i -e "s/\[PROJECT_ID\]/$PROJECT/g" kubernetes-config/locust-master-controller.yaml
+sed -i -e "s/\[PROJECT_ID\]/$PROJECT/g" kubernetes-config/locust-worker-controller.yaml
+Deploy the Locust master and worker nodes:
+
+
+kubectl apply -f kubernetes-config/locust-master-controller.yaml
+kubectl apply -f kubernetes-config/locust-master-service.yaml
+kubectl apply -f kubernetes-config/locust-worker-controller.yaml
+Verify the Locust deployments:
+
+
+kubectl get pods -o wide
+The output looks something like the following:
+
+
+NAME                             READY   STATUS    RESTARTS   AGE   IP           NODE
+locust-master-87f8ffd56-pxmsk    1/1     Running   0          1m    10.32.2.6    gke-gke-load-test-default-pool-96a3f394
+locust-worker-58879b475c-279q9   1/1     Running   0          1m    10.32.1.5    gke-gke-load-test-default-pool-96a3f394
+locust-worker-58879b475c-9frbw   1/1     Running   0          1m    10.32.2.8    gke-gke-load-test-default-pool-96a3f394
+locust-worker-58879b475c-dppmz   1/1     Running   0          1m    10.32.2.7    gke-gke-load-test-default-pool-96a3f394
+locust-worker-58879b475c-g8tzf   1/1     Running   0          1m    10.32.0.11   gke-gke-load-test-default-pool-96a3f394
+locust-worker-58879b475c-qcscq   1/1     Running   0          1m    10.32.1.4    gke-gke-load-test-default-pool-96a3f394
+Verify the services:
+
+
+kubectl get services
+The output looks something like the following:
+
+
+NAME            TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)                                        AGE
+kubernetes      ClusterIP      10.35.240.1     <none>          443/TCP                                        12m
+locust-master   LoadBalancer   10.35.250.221   35.222.247.12   8089:30680/TCP,5557:30699/TCP,5558:31386/TCP   1m
+Run a watch loop while an external IP address is assigned to the Locust master service:
+
+
+kubectl get svc locust-master --watch
+Press Ctrl+C to exit the watch loop and then run the following command to note the external IP address:
+
+
+EXTERNAL_IP=$(kubectl get svc locust-master -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
+Testing the load
+You can use the Locust master web interface to execute the load testing tasks against the system under test.
+
+Get the external IP address of the system:
+
+
+echo $EXTERNAL_IP
+Open your browser and then open the Locust master web interface. For [EXTERNAL_IP] in the following URL, substitute the IP address you got in the previous step: http://[EXTERNAL_IP]:8089.
+
+The Locust master web interface provides a dialog for starting a new
+swarm and specifying Number of users and hatch rate.
+
+Specify the total Number of users to simulate as 10 and the Hatch rate at which users should be spawned as 5 users per second.
+
+Click Start swarming to begin the simulation.
+
+After requests start swarming, statistics begin to aggregate for simulation metrics, such as the number of requests and requests per second, as shown in the following image:
+
+The Locust web interface shows statistics begin to aggregate.
+Click Stop to terminate the test.
+
+You can view the deployed service and other metrics from the Google Cloud console.
+
+The App Engine dashboard shows a graph of an hour of requests by type.
+Scaling up the number of users (optional)
+If you want to test increased load on the application, you can add simulated users. Before you can add simulated users, you must ensure that there are enough resources to support the increase in load. With Google Cloud, you can add Locust worker pods to the deployment without redeploying the existing pods, as long as you have the underlying VM resources to support an increased number of pods. The initial GKE cluster starts with 3 nodes and can auto-scale up to 10 nodes.
+
+Scale the pool of Locust worker pods to 20.
+
+
+kubectl scale deployment/locust-worker --replicas=20
+It takes a few minutes to deploy and start the new pods.
+
+If you see a Pod Unschedulable error, you must add more nodes to the cluster. For details, see resizing a GKE cluster.
+
+After the pods start, return to the Locust master web interface and restart load testing.
