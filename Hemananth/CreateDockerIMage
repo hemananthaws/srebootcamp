@@ -1,0 +1,9 @@
+Create a sample website using docker container
+
+docker run -p 8080:80 nginx:latest
+--Create Index.html in local to remplace, 
+docker cp index.html [container-id]:/usr/share/nginx/html/
+docker commit [container-id] cad/my-web-server:version1
+docker tag cad/web:version1 us.gcr.io/$PROJECTID/my-web-server:version1
+docker push us.gcr.io/$PROJECTID/my-web-server:version1
+
