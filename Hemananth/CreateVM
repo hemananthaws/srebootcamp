@@ -1,0 +1,27 @@
+Page up
+#!/bin/sh
+#export ZONE="us-central1-a"
+echo "Please enter instance Name?"
+read INSTANCE_NAME
+echo "Please enter the Zone for $INSTANCE_NAME ?"
+read ZONE
+gcloud compute instances create $INSTANCE_NAME
+        --project=absolute-realm-322617  \
+        --zone=$ZONE \
+        --machine-type=e2-medium \
+        --network-interface=network-tier=PREMIUM,subnet=default \
+        --maintenance-policy=MIGRATE \
+        --service-account=302690496231-compute@developer.gserviceaccount.com \
+        --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.wri
+te,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.go
+ogleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append \
+        --tags=http-server,https-server \
+        --image=centos-7-v20210817 \
+        --image-project=centos-cloud \
+        --boot-disk-size=20GB \
+        --boot-disk-type=pd-balanced \
+        --boot-disk-device-name=$INSTANCE_NAME \
+        --no-shielded-secure-boot \
+        --shielded-vtpm \ 
+        --shielded-integrity-monitoring \
+        --reservation-affinity=any 
